@@ -1,0 +1,22 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Debug Main",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/src/bmp_scan.exe",
+            // "args": ["-p"],
+            "stopAtEntry": true,
+            "MIMode": "gdb",
+            "miDebuggerPath": "C:/msys64/mingw64/bin/gdb.exe",
+            "cwd": "${workspaceFolder}",
+            "environment": [],
+            "preLaunchTask": "Make Main",
+            "externalConsole": false
+        }
+    ]
+}
