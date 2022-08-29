@@ -32,6 +32,11 @@ void platform_buffer_flush(void);
 #define VENDOR_ID_SEGGER         0x1366
 #define PRODUCT_ID_UNKNOWN       0xFFFF
 
+#define VENDOR_ID_FTDI			 0x0403
+#define PRODUCT_ID_FTDI_FT2232	 0x6010
+#define PRODUCT_ID_FTDI_FT4232	 0x6011
+#define PRODUCT_ID_FTDI_FT232	 0x6014
+
 typedef enum bmp_type_e {
 	BMP_TYPE_NONE = 0,
 	BMP_TYPE_BMP,
