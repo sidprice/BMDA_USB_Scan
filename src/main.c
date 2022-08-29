@@ -33,26 +33,90 @@ DEBUGGER_DEVICE	debuggerDevices[] = {
 	{ 0, 0, BMP_TYPE_NONE, false, ""},
 } ;
 
+struct libusb_device_descriptor *device_check_for_cmsis_interface(struct libusb_device_descriptor *device_descriptor, struct libusb_config_descriptor *config)
+{
+	(void)device_descriptor ;
+	(void)config ;
+	return NULL ;
+}
+
+struct libusb_device_descriptor * device_in_vid_pid_table(struct libusb_device_descriptor *device_descriptor) {
+	(void)device_descriptor ;
+	return NULL ;
+}
+
 int find_debuggers(BMP_CL_OPTIONS_t *cl_opts, bmp_info_t *info)
 {
 	(void)cl_opts ;
 	(void)info ;
+
 	libusb_device **device_list;
 	struct libusb_device_descriptor device_descriptor;
+	struct libusb_device_descriptor *known_device_descriptor;
+	libusb_device *device;
+	libusb_device_handle *handle = NULL;
+	struct libusb_config_descriptor *config = NULL;
+
 	int result;
 	ssize_t cnt;
-	libusb_device *device;
-	int deviceIndex = 0, vid_pid_index = 0 ;
-	int debuggerCount = 1 ;
-	//uint8_t path[8];
+	int deviceIndex = 0 ;
+	//int debuggerCount = 1 ;
+
 	result = libusb_init(NULL);
 	if (result == 0) {
 		cnt = libusb_get_device_list(NULL, &device_list);
 		if (cnt > 0) {
 			//
-			// Parse the list of USB devices found and initially
-			// filter them using the VID:PID table
+			// Parse the list of USB devices found
 			//
+			while ((device = device_list[deviceIndex++]) != NULL) {
+				int r = libusb_get_device_descriptor(device, &device_descriptor);
+				if (r < 0) {
+					fprintf(stderr, "failed to get device descriptor");
+					return -1;
+				}				//
+				// First check if the device is in the VID:PID table
+				//
+				if ( (known_device_descriptor = device_in_vid_pid_table(&device_descriptor)) == NULL) {
+					//
+					// Open the device and check if there is a CMSIS interface
+					//
+					known_device_descriptor = device_check_for_cmsis_interface(&device_descriptor, config) ;
+				} else {
+					//
+					// In order to later get the serial number the device must be opened
+					//
+					// Note that the process of checking for a CMSIS interface opens the
+					// device so we must not repeat that below
+					//
+					if ( libusb_open(device, &handle) != 0) {
+						known_device_descriptor = NULL;	// failed to open device
+					} else {
+						//
+						// Similarly, the code below assumes the config descriptor has been read,
+						// so we must do it here for devices in the VID:PID table
+						//
+						if (libusb_get_active_config_descriptor(device, &config) != 0 ) {
+							//
+							// Failed to read the config descriptor, no longer have valid device
+							//
+							known_device_descriptor = NULL ;
+							libusb_close(handle) ;
+						}
+					}
+				}
+				//
+				// If we have a known device we can continue to report its data
+				//
+				if ( known_device_descriptor != NULL) {
+					libusb_close(handle) ;	// Clean up
+				}
+			}
+			libusb_free_device_list(device_list, 1);
+
+
+
+#if 0
 			while ((device = device_list[deviceIndex++]) != NULL) {
 				bool	debuggerFound = false ;
 				int r = libusb_get_device_descriptor(device, &device_descriptor);
@@ -60,6 +124,7 @@ int find_debuggers(BMP_CL_OPTIONS_t *cl_opts, bmp_info_t *info)
 					fprintf(stderr, "failed to get device descriptor");
 					return -1;
 				}
+
 				while ( debuggerDevices[vid_pid_index].type != BMP_TYPE_NONE) {
 					debuggerFound = false ;
 					if ( device_descriptor.idVendor == debuggerDevices[vid_pid_index].vendor && 
@@ -113,24 +178,9 @@ int find_debuggers(BMP_CL_OPTIONS_t *cl_opts, bmp_info_t *info)
 					if (handle != NULL ) {
 						libusb_close(handle) ;
 					}
-					// if (!cmsis_dap) {
-					// 	libusb_close(handle);
-					// 	continue;
-					// }
 				}
 			}
-				// printf("%04x:%04x (bus %d, device %d)",
-				// 	desc.idVendor, desc.idProduct,
-				// 	libusb_get_bus_number(dev), libusb_get_device_address(dev));
-
-				// r = libusb_get_port_numbers(dev, path, sizeof(path));
-				// if (r > 0) {
-				// 	printf(" path: %d", path[0]);
-				// 	for (j = 1; j < r; j++)
-				// 		printf(".%d", path[j]);
-				// }
-				// printf("\n");
-			libusb_free_device_list(device_list, 1);
+#endif
 		}
 		libusb_exit(NULL);
 	}
