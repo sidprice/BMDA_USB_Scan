@@ -2,5 +2,21 @@
     "files.associations": {
         "platform.h": "c",
         "libusb.h": "c"
-    }
+    },
+    "clang-tidy.compilerArgs": [
+        "-std=gnu11",
+        "-DDFU_SERIAL_LENGTH=9",
+        "-DPC_HOSTED=0",
+        "-DSTM32F1",
+        "-DBLACKMAGIC",
+        "-IC:/msys64/ucrt64/include",
+        "-ID:/DataRoot/Projects/blackmagic/src/include",
+        "-ID:/DataRoot/Projects/blackmagic/src/platforms/common",
+        "-ID:/DataRoot/Projects/blackmagic/src/platforms/native",
+        "-ID:/DataRoot/Projects/blackmagic/src/platforms/stm32",
+        "-ID:/DataRoot/Projects/blackmagic/src/target",
+        "-ID:/DataRoot/Projects/blackmagic/src/target/flashstub",
+        "-ID:/DataRoot/Projects/blackmagic/src",
+        "-ID:/DataRoot/Projects/blackmagic/libopencm3/include"
+    ]
 }
