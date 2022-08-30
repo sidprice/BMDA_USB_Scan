@@ -3,9 +3,9 @@
 
 #include "libusb-1.0/libusb.h"
 
-#include "../inc/bmp_hosted.h"
 #include "../inc/cli.h"
 #include "../inc/platform.h"
+#include "../inc/bmp_hosted.h"
 
 typedef struct debuggerDevice {
 	uint16_t vendor;
