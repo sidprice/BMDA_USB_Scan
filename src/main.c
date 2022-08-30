@@ -34,7 +34,8 @@ DEBUGGER_DEVICE debuggerDevices[] = {
 };
 
 struct libusb_device_descriptor *device_check_for_cmsis_interface(struct libusb_device_descriptor *device_descriptor,
-	struct libusb_config_descriptor *config, libusb_device *device, libusb_device_handle *handle)
+	struct libusb_config_descriptor *config, libusb_device *device, libusb_device_handle *handle,
+	char *serial_number_string, int serial_number_max_len, char *type_string, int type_string_max_len)
 {
 	struct libusb_device_descriptor *result = NULL;
 	if (libusb_get_active_config_descriptor(device, &config) == 0 && libusb_open(device, &handle) == 0) {
@@ -46,20 +47,20 @@ struct libusb_device_descriptor *device_check_for_cmsis_interface(struct libusb_
 				const uint8_t string_index = descriptor->iInterface;
 				if (string_index == 0)
 					continue;
-				char iface_string[256];
-				char serial_number_string[256];
 				/* Read back the string descriptor interpreted as ASCII (wrong but
          * easier to deal with in C) */
 				if (libusb_get_string_descriptor_ascii(
-						handle, string_index, (unsigned char *)iface_string, sizeof(iface_string)) < 0)
+						handle, string_index, (unsigned char *)type_string, type_string_max_len) < 0)
 					continue; /* We failed but that's a soft error at this point. */
-				if (libusb_get_string_descriptor_ascii(handle, device_descriptor->iSerialNumber,
-						(unsigned char *)serial_number_string, sizeof(serial_number_string)) < 0)
+				if (libusb_get_string_descriptor_ascii(
+						handle, device_descriptor->iSerialNumber, (unsigned char *)serial_number_string, serial_number_max_len) < 0)
 					continue;
-				if (strstr(iface_string, "CMSIS") != NULL) {
+				if (strstr((char *)type_string, "CMSIS") != NULL) {
 					result = device_descriptor;
 					cmsis_dap = true;
-					break;
+				}
+				else {
+					memset(type_string, 0x00, type_string_max_len) ;
 				}
 			}
 		}
@@ -68,7 +69,7 @@ struct libusb_device_descriptor *device_check_for_cmsis_interface(struct libusb_
 }
 
 struct libusb_device_descriptor *device_in_vid_pid_table(
-	struct libusb_device_descriptor *device_descriptor, char *debugger_type_string)
+	struct libusb_device_descriptor *device_descriptor, char *debugger_type_string, ssize_t string_length)
 {
 	struct libusb_device_descriptor *result = NULL;
 	ssize_t vid_pid_index = 0;
@@ -77,7 +78,7 @@ struct libusb_device_descriptor *device_in_vid_pid_table(
 			(device_descriptor->idProduct == debuggerDevices[vid_pid_index].product ||
 				debuggerDevices[vid_pid_index].product == PRODUCT_ID_UNKNOWN)) {
 			result = device_descriptor;
-			strncpy(debugger_type_string, debuggerDevices[vid_pid_index].typeString, sizeof(debugger_type_string) - 1);
+			strncpy(debugger_type_string, debuggerDevices[vid_pid_index].typeString, string_length);
 			break;
 		}
 		vid_pid_index++;
@@ -97,8 +98,6 @@ int find_debuggers(BMP_CL_OPTIONS_t *cl_opts, bmp_info_t *info)
 	libusb_device_handle *handle = NULL;
 	struct libusb_config_descriptor *config = NULL;
 
-	char debugger_type_string[64];
-
 	int result;
 	ssize_t cnt;
 	int deviceIndex = 0;
@@ -112,21 +111,24 @@ int find_debuggers(BMP_CL_OPTIONS_t *cl_opts, bmp_info_t *info)
 			// Parse the list of USB devices found
 			//
 			while ((device = device_list[deviceIndex++]) != NULL) {
-				int r = libusb_get_device_descriptor(device, &device_descriptor);
-				if (r < 0) {
-					fprintf(stderr, "failed to get device descriptor");
+				char serial_number_string[64];
+				char debugger_type_string[64];
+				result = libusb_get_device_descriptor(device, &device_descriptor);
+				memset(debugger_type_string, 0x00, sizeof(debugger_type_string));
+				if (result < 0) {
+					result = fprintf(stderr, "failed to get device descriptor");
 					return -1;
 				}
 				//
 				// First check if the device is in the VID:PID table
 				//
-				if ((known_device_descriptor = device_in_vid_pid_table(&device_descriptor, debugger_type_string)) ==
-					NULL) {
+				if ((known_device_descriptor = device_in_vid_pid_table(
+						 &device_descriptor, debugger_type_string, sizeof(debugger_type_string) - 1)) == NULL) {
 					//
 					// Open the device and check if there is a CMSIS interface
 					//
-					known_device_descriptor =
-						device_check_for_cmsis_interface(&device_descriptor, config, device, handle);
+					known_device_descriptor = device_check_for_cmsis_interface(
+						&device_descriptor, config, device, handle, serial_number_string, sizeof(serial_number_string), debugger_type_string, sizeof(debugger_type_string));
 				} else {
 					//
 					// In order to later get the serial number the device must be opened
@@ -155,8 +157,11 @@ int find_debuggers(BMP_CL_OPTIONS_t *cl_opts, bmp_info_t *info)
 				// If we have a known device we can continue to report its data
 				//
 				if (known_device_descriptor != NULL) {
+					//
+					// Read the serial number from the config descriptor
+					//
 					printf("%d\t%04hX:%04hX\t%-20s\tS/N: %s\n", debuggerCount++, device_descriptor.idVendor,
-						device_descriptor.idProduct, debugger_type_string, "serial");
+						device_descriptor.idProduct, debugger_type_string, serial_number_string);
 					libusb_close(handle); // Clean up
 				}
 			}
