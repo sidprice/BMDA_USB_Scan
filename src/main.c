@@ -34,7 +34,8 @@ DEBUGGER_DEVICE debuggerDevices[] = {
 };
 
 struct libusb_device_descriptor *device_check_for_cmsis_interface(struct libusb_device_descriptor *device_descriptor,
-	struct libusb_config_descriptor *config, libusb_device *device, libusb_device_handle *handle, char *type_string, int type_string_max_len)
+	struct libusb_config_descriptor *config, libusb_device *device, libusb_device_handle *handle, char *type_string,
+	int type_string_max_len)
 {
 	struct libusb_device_descriptor *result = NULL;
 	if (libusb_get_active_config_descriptor(device, &config) == 0 && libusb_open(device, &handle) == 0) {
@@ -57,9 +58,8 @@ struct libusb_device_descriptor *device_check_for_cmsis_interface(struct libusb_
 				if (strstr((char *)type_string, "CMSIS") != NULL) {
 					result = device_descriptor;
 					cmsis_dap = true;
-				}
-				else {
-					memset(type_string, 0x00, type_string_max_len) ;
+				} else {
+					memset(type_string, 0x00, type_string_max_len);
 				}
 			}
 		}
@@ -128,48 +128,38 @@ int find_debuggers(BMP_CL_OPTIONS_t *cl_opts, bmp_info_t *info)
 					//
 					known_device_descriptor = device_check_for_cmsis_interface(
 						&device_descriptor, config, device, handle, debugger_type_string, sizeof(debugger_type_string));
-				} else {
-					//
-					// In order to later get the serial number the device must be opened
-					//
-					// Note that the process of checking for a CMSIS interface opens the
-					// device so we must not repeat that below
-					//
-					if (libusb_open(device, &handle) != 0) {
-						known_device_descriptor = NULL; // failed to open device
-					} else {
-						//
-						// Similarly,  the code below assumes the config descriptor has been
-						// read, so we must do it here for devices in the VID:PID table
-						//
-						if (libusb_get_active_config_descriptor(device, &config) != 0) {
-							//
-							// Failed to read the config descriptor, no longer have valid
-							// device
-							//
-							known_device_descriptor = NULL;
-							libusb_close(handle);
-						}
-					}
 				}
 				//
 				// If we have a known device we can continue to report its data
 				//
 				if (known_device_descriptor != NULL) {
-					if ( device_descriptor.idVendor == VENDOR_ID_STLINK && device_descriptor.idProduct == PRODUCT_ID_STLINKV2) {
+					if (device_descriptor.idVendor == VENDOR_ID_STLINK &&
+						device_descriptor.idProduct == PRODUCT_ID_STLINKV2) {
 						memcpy(serial_number_string, "Unknown", 8);
 					} else {
 						//
 						// Read the serial number from the config descriptor
 						//
-						if ((result = libusb_get_string_descriptor_ascii(handle, known_device_descriptor->iSerialNumber, (unsigned char *)serial_number_string, sizeof(serial_number_string))) <= 0) {
-							serial_number_string[0] = 0x00 ;
+						if (handle == 0) {
+							libusb_open(device, &handle);
+						}
+						if (handle != 0) {
+							if ((result = libusb_get_string_descriptor_ascii(handle,
+									 known_device_descriptor->iSerialNumber, (unsigned char *)serial_number_string,
+									 sizeof(serial_number_string))) <= 0) {
+								serial_number_string[0] = 0x00;
+							}
+						} else {
+							memcpy(serial_number_string, "Unknown", sizeof("Unknown"));
 						}
 					}
 
 					printf("%d\t%04hX:%04hX\t%-20s\tS/N: %s\n", debuggerCount++, device_descriptor.idVendor,
 						device_descriptor.idProduct, debugger_type_string, serial_number_string);
-					libusb_close(handle); // Clean up
+					if (handle != 0) {
+						libusb_close(handle); // Clean up
+						handle = 0;
+					}
 				}
 			}
 			libusb_free_device_list(device_list, 1);
