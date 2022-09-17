@@ -156,12 +156,15 @@ int find_debuggers(BMP_CL_OPTIONS_t *cl_opts, bmp_info_t *info)
 				// If we have a known device we can continue to report its data
 				//
 				if (known_device_descriptor != NULL) {
-					//
-					// Read the serial number from the config descriptor
-					//
-					serial_number_string[0] = 0x00 ;
-					if ((result = libusb_get_string_descriptor_ascii(handle, known_device_descriptor->iSerialNumber, (unsigned char *)serial_number_string, sizeof(serial_number_string))) <= 0) {
-						serial_number_string[0] = 0x00 ;
+					if ( device_descriptor.idVendor == VENDOR_ID_STLINK && device_descriptor.idProduct == PRODUCT_ID_STLINKV2) {
+						memcpy(serial_number_string, "Unknown", 8);
+					} else {
+						//
+						// Read the serial number from the config descriptor
+						//
+						if ((result = libusb_get_string_descriptor_ascii(handle, known_device_descriptor->iSerialNumber, (unsigned char *)serial_number_string, sizeof(serial_number_string))) <= 0) {
+							serial_number_string[0] = 0x00 ;
+						}
 					}
 
 					printf("%d\t%04hX:%04hX\t%-20s\tS/N: %s\n", debuggerCount++, device_descriptor.idVendor,
