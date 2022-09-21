@@ -5,7 +5,7 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Debug Main",
+            "name": "Debug Windows",
             "type": "cppdbg",
             "request": "launch",
             "program": "${workspaceFolder}/src/bmp_scan.exe",
@@ -13,6 +13,20 @@
             "stopAtEntry": true,
             "MIMode": "gdb",
             "miDebuggerPath": "C:/msys64/mingw64/bin/gdb.exe",
+            "cwd": "${workspaceFolder}",
+            "environment": [],
+            "preLaunchTask": "Make Main",
+            "externalConsole": false
+        },
+        {
+            "name": "Debug Linux",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/src/BMP_Scan",
+            // "args": ["-p"],
+            "stopAtEntry": true,
+            "MIMode": "gdb",
+            // "miDebuggerPath": "C:/msys64/mingw64/bin/gdb.exe",
             "cwd": "${workspaceFolder}",
             "environment": [],
             "preLaunchTask": "Make Main",
