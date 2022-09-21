@@ -2,3 +2,5 @@
 *.o
 
 *.exe
+
+src/BMP_Scan
