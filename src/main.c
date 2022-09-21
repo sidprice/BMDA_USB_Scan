@@ -1,7 +1,9 @@
 #include <stdbool.h>
 #include <stdio.h>
+#include <string.h>
 
 #include "libusb-1.0/libusb.h"
+#include "libftdi1/ftdi.h"
 
 #include "../inc/cli.h"
 #include "../inc/platform.h"
@@ -35,18 +37,66 @@ static PROBE_INFORMATION probes[MAX_PROBES];
 //
 DEBUGGER_DEVICE debuggerDevices[] = {
 	{VENDOR_ID_BMP, PRODUCT_ID_BMP, BMP_TYPE_BMP, false, "Black Magic Probe"},
-	{VENDOR_ID_STLINK, PRODUCT_ID_STLINKV2, BMP_TYPE_STLINKV2, false, "STLink V2"},
-	{VENDOR_ID_STLINK, PRODUCT_ID_STLINKV21, BMP_TYPE_STLINKV2, false, "STLink V21"},
-	{VENDOR_ID_STLINK, PRODUCT_ID_STLINKV21_MSD, BMP_TYPE_STLINKV2, false, "STLink V21 MSD"},
-	{VENDOR_ID_STLINK, PRODUCT_ID_STLINKV3_NO_MSD, BMP_TYPE_STLINKV2, false, "STLink V21 No MSD"},
-	{VENDOR_ID_STLINK, PRODUCT_ID_STLINKV3, BMP_TYPE_STLINKV2, false, "STLink V3"},
-	{VENDOR_ID_STLINK, PRODUCT_ID_STLINKV3E, BMP_TYPE_STLINKV2, false, "STLink V3E"},
+	{VENDOR_ID_STLINK, PRODUCT_ID_STLINKV2, BMP_TYPE_STLINKV2, false, "ST-Link v2"},
+	{VENDOR_ID_STLINK, PRODUCT_ID_STLINKV21, BMP_TYPE_STLINKV2, false, "ST-Link v2.1"},
+	{VENDOR_ID_STLINK, PRODUCT_ID_STLINKV21_MSD, BMP_TYPE_STLINKV2, false, "ST-Link v2.1 MSD"},
+	{VENDOR_ID_STLINK, PRODUCT_ID_STLINKV3_NO_MSD, BMP_TYPE_STLINKV2, false, "ST-Link v2.1 No MSD"},
+	{VENDOR_ID_STLINK, PRODUCT_ID_STLINKV3, BMP_TYPE_STLINKV2, false, "ST-Link v3"},
+	{VENDOR_ID_STLINK, PRODUCT_ID_STLINKV3E, BMP_TYPE_STLINKV2, false, "ST-Link v3E"},
 	{VENDOR_ID_SEGGER, PRODUCT_ID_UNKNOWN, BMP_TYPE_JLINK, false, "Segger JLink"},
 	{VENDOR_ID_FTDI, PRODUCT_ID_FTDI_FT2232, BMP_TYPE_LIBFTDI, false, "FTDI FT2232"},
 	{VENDOR_ID_FTDI, PRODUCT_ID_FTDI_FT4232, BMP_TYPE_LIBFTDI, false, "FTDI FT4232"},
 	{VENDOR_ID_FTDI, PRODUCT_ID_FTDI_FT232, BMP_TYPE_LIBFTDI, false, "FTDI FT232"},
 	{0, 0, BMP_TYPE_NONE, false, ""},
 };
+
+static struct ftdi_context *ftdi = NULL;
+struct libusb_device_descriptor *process_ftdi_probe(
+	struct libusb_device_descriptor *device_descriptor, libusb_device *device, PROBE_INFORMATION *probe_information)
+{
+	struct libusb_device_descriptor *result = NULL;
+	struct ftdi_device_list *devlist;
+	struct ftdi_device_list *curdev;
+	char manufacturer[128];
+	char description[128];
+	int ret;
+	int index;
+	//struct ftdi_version_info version;
+	if (ftdi == NULL) {
+		if ((ftdi = ftdi_new()) == 0) {
+			printf("ftdi_new failed\n");
+			return NULL;
+		}
+	}
+
+	ssize_t vid_pid_index = 0;
+	(void)device;
+	while (debuggerDevices[vid_pid_index].type != BMP_TYPE_NONE) {
+		if (device_descriptor->idVendor == debuggerDevices[vid_pid_index].vendor &&
+			(device_descriptor->idProduct == debuggerDevices[vid_pid_index].product ||
+				debuggerDevices[vid_pid_index].product == PRODUCT_ID_UNKNOWN)) {
+			result = device_descriptor;
+			memcpy(probe_information->probe_type, debuggerDevices[vid_pid_index].typeString,
+				strlen(debuggerDevices[vid_pid_index].typeString));
+			if ((ret = ftdi_usb_find_all(ftdi, &devlist, 0, 0)) >= 0) {
+				for (curdev = devlist; curdev != NULL; index++) {
+					printf("Checking device: %d\n", index);
+					if ((ret = ftdi_usb_get_strings(ftdi, curdev->dev, manufacturer, 128, description, 128, NULL, 0)) <
+						0) {
+						printf("ftdi_usb_get_strings failed: %d (%s)\n", ret, ftdi_get_error_string(ftdi));
+						curdev = NULL;
+					} else {
+						printf("Manufacturer: %s, Description: %s\n\n", manufacturer, description);
+					}
+					curdev = curdev->next;
+				}
+			}
+			break;
+		}
+		vid_pid_index++;
+	}
+	return result;
+}
 
 struct libusb_device_descriptor *device_check_for_cmsis_interface(struct libusb_device_descriptor *device_descriptor,
 	libusb_device *device, libusb_device_handle *handle, PROBE_INFORMATION *probe_information)
@@ -73,9 +123,10 @@ struct libusb_device_descriptor *device_check_for_cmsis_interface(struct libusb_
 					//
 					// Read the serial number from the probe
 					//
-					string_index = device_descriptor->iSerialNumber ;
+					string_index = device_descriptor->iSerialNumber;
 					if (libusb_get_string_descriptor_ascii(handle, string_index,
-						(unsigned char *)probe_information->serial_number, sizeof(probe_information->serial_number)) < 0)
+							(unsigned char *)probe_information->serial_number,
+							sizeof(probe_information->serial_number)) < 0)
 						continue; /* We failed but that's a soft error at this point. */
 
 					result = device_descriptor;
@@ -155,8 +206,9 @@ int find_debuggers(BMP_CL_OPTIONS_t *cl_opts, bmp_info_t *info)
 				//
 				// Check if the device is an FTDI probe
 				//
-				if (debuggerDevices[debuggerCount - 1].vendor == VENDOR_ID_FTDI) {
-					//known_device_descriptor = process_ftdi_probe(&device_descriptor, device, &probes[debuggerCount - 1]) ;
+				if (device_descriptor.idVendor == VENDOR_ID_FTDI) {
+					known_device_descriptor =
+						process_ftdi_probe(&device_descriptor, device, &probes[debuggerCount - 1]);
 				} else if ((known_device_descriptor = device_in_vid_pid_table(
 								&device_descriptor, device, &probes[debuggerCount - 1])) == NULL) {
 					//
@@ -180,6 +232,9 @@ int find_debuggers(BMP_CL_OPTIONS_t *cl_opts, bmp_info_t *info)
 				}
 			}
 			libusb_free_device_list(device_list, 1);
+		}
+		if (ftdi != NULL) {
+			ftdi_free(ftdi);
 		}
 		libusb_exit(NULL);
 	}
