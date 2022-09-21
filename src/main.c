@@ -162,7 +162,7 @@ struct libusb_device_descriptor *device_in_vid_pid_table(
 				}
 				libusb_close(handle);
 			} else {
-				memcpy(probe_information->probe_type, "Unknown", sizeof("Unknown"));
+				memcpy(probe_information->serial_number, "Unknown", sizeof("Unknown"));
 			}
 
 			break;
@@ -236,7 +236,7 @@ int find_debuggers(BMP_CL_OPTIONS_t *cl_opts, bmp_info_t *info)
 		if (ftdi != NULL) {
 			ftdi_free(ftdi);
 		}
-		libusb_exit(NULL);
+		libusb_exit(NULL); // Silly
 	}
 
 	return result;
