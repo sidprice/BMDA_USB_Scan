@@ -26,7 +26,7 @@
             // "args": ["-p"],
             "stopAtEntry": true,
             "MIMode": "gdb",
-            // "miDebuggerPath": "C:/msys64/mingw64/bin/gdb.exe",
+            "miDebuggerPath": "gdb",
             "cwd": "${workspaceFolder}",
             "environment": [],
             "preLaunchTask": "Make Main",
