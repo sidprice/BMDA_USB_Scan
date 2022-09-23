@@ -50,7 +50,8 @@ DEBUGGER_DEVICE debuggerDevices[] = {
 	{0, 0, BMP_TYPE_NONE, false, ""},
 };
 
-static struct ftdi_context *ftdi = NULL;
+static struct ftdi_context ftdi ;
+
 struct libusb_device_descriptor *process_ftdi_probe(
 	struct libusb_device_descriptor *device_descriptor, libusb_device *device, PROBE_INFORMATION *probe_information)
 {
@@ -60,14 +61,15 @@ struct libusb_device_descriptor *process_ftdi_probe(
 	char manufacturer[128];
 	char description[128];
 	int ret;
-	int index;
+	int index = 0 ;
 	//struct ftdi_version_info version;
-	if (ftdi == NULL) {
-		if ((ftdi = ftdi_new()) == 0) {
-			printf("ftdi_new failed\n");
-			return NULL;
-		}
-	}
+	// if (ftdi == NULL) {
+		ftdi_init(&ftdi) ;
+		// if ((ftdi = ftdi_new()) == 0) {
+		// 	printf("ftdi_new failed\n");
+		// 	return NULL;
+		// }
+	// }
 
 	ssize_t vid_pid_index = 0;
 	(void)device;
@@ -78,13 +80,12 @@ struct libusb_device_descriptor *process_ftdi_probe(
 			result = device_descriptor;
 			memcpy(probe_information->probe_type, debuggerDevices[vid_pid_index].typeString,
 				strlen(debuggerDevices[vid_pid_index].typeString));
-			if ((ret = ftdi_usb_find_all(ftdi, &devlist, 0, 0)) >= 0) {
+			if ((ret = ftdi_usb_find_all(&ftdi, &devlist, 0, 0)) >= 0) {
 				for (curdev = devlist; curdev != NULL; index++) {
 					printf("Checking device: %d\n", index);
-					if ((ret = ftdi_usb_get_strings(ftdi, curdev->dev, manufacturer, 128, description, 128, NULL, 0)) <
+					if ((ret = ftdi_usb_get_strings(&ftdi, curdev->dev, manufacturer, 128, description, 128, NULL, 0)) <
 						0) {
-						printf("ftdi_usb_get_strings failed: %d (%s)\n", ret, ftdi_get_error_string(ftdi));
-						curdev = NULL;
+						printf("ftdi_usb_get_strings failed: %d (%s)\n", ret, ftdi_get_error_string(&ftdi));
 					} else {
 						printf("Manufacturer: %s, Description: %s\n\n", manufacturer, description);
 					}
@@ -233,16 +234,45 @@ int find_debuggers(BMP_CL_OPTIONS_t *cl_opts, bmp_info_t *info)
 			}
 			libusb_free_device_list(device_list, 1);
 		}
-		if (ftdi != NULL) {
-			ftdi_free(ftdi);
-		}
+		// if (ftdi != NULL) {
+		// 	ftdi_free(ftdi);
+		// }
 		libusb_exit(NULL); // Silly
 	}
 
 	return result;
 }
 
-int main(void)
+// int main(void)
+// {
+// 	return find_debuggers(NULL, NULL);
+// }
+
+int main(int argc, char **argv)
 {
-	return find_debuggers(NULL, NULL);
+    int ret, i;
+    struct ftdi_context ftdic;
+    struct ftdi_device_list *devlist, *curdev;
+    char manufacturer[128], description[128];
+	(void)argc ;
+	(void)argv ;
+    ftdi_init(&ftdic);
+    if((ret = ftdi_usb_find_all(&ftdic, &devlist, 0x0403, 0x6010)) < 0) {
+        fprintf(stderr, "ftdi_usb_find_all failed: %d (%s)\n", ret, ftdi_get_error_string(&ftdic));
+        return -1;
+    }
+    printf("Number of FTDI devices found: %d\n", ret);
+    i = 0;
+    for (curdev = devlist; curdev != NULL; i++) {
+        printf("Checking device: %d\n", i);
+        if((ret = ftdi_usb_get_strings(&ftdic, curdev->dev, manufacturer, 128, description, 128, NULL, 0)) < 0) {
+            fprintf(stderr, "ftdi_usb_get_strings failed: %d (%s)\n", ret, ftdi_get_error_string(&ftdic));
+            return -1;
+        }
+        printf("Manufacturer: %s, Description: %s\n\n", manufacturer, description);
+        curdev = curdev->next;
+    }
+    ftdi_list_free(&devlist);
+    ftdi_deinit(&ftdic);
+    return 0;
 }
