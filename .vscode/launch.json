@@ -15,7 +15,7 @@
             "miDebuggerPath": "C:/msys64/mingw64/bin/gdb.exe",
             "cwd": "${workspaceFolder}",
             "environment": [],
-            "preLaunchTask": "Make Main",
+            "preLaunchTask": "Make BMDA_SCAN",
             "externalConsole": false
         },
         {
@@ -29,7 +29,7 @@
             "miDebuggerPath": "gdb",
             "cwd": "${workspaceFolder}",
             "environment": [],
-            "preLaunchTask": "Make Main",
+            "preLaunchTask": "Make BMDA_SCAN",
             "externalConsole": false
         }
     ]

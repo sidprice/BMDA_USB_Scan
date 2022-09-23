@@ -1,10 +1,23 @@
 {
     "tasks": [
         {
-            "label": "Make Main",
+            "label": "Make BMDA_SCAN",
             "type": "shell",
             "group": "build",
             "command": "make ",
+            "options": {
+                "cwd": "${workspaceFolder}/src"
+            },
+            "problemMatcher": "$gcc"
+        },
+        {
+            "label": "Clean",
+            "type": "shell",
+            "group": "build",
+            "command": "make ",
+            "args": [
+                "clean"
+            ],
             "options": {
                 "cwd": "${workspaceFolder}/src"
             },
