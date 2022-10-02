@@ -239,40 +239,42 @@ int find_debuggers(BMP_CL_OPTIONS_t *cl_opts, bmp_info_t *info)
 	return result;
 }
 
-int main(void)
-{
-	return find_debuggers(NULL, NULL);
-}
-
-// int main(int argc, char **argv)
+// int main(void)
 // {
-//     int ret, i;
-//     struct ftdi_context ftdic;
-//     struct ftdi_device_list *devlist, *curdev;
-//     char manufacturer[128], description[128], serial[128];
-// 	(void)argc ;
-// 	(void)argv ;
-//     ftdi_init(&ftdic);
-//     if((ret = ftdi_usb_find_all(&ftdic, &devlist, 0x0403, 0x6010)) < 0) {
-//         fprintf(stderr, "ftdi_usb_find_all failed: %d (%s)\n", ret, ftdi_get_error_string(&ftdic));
-//         return -1;
-//     }
-//     printf("Number of FTDI devices found: %d\n", ret);
-// 	// if ((ret = ftdi_usb_open_desc(&ftdic, 0x0403, 0x6010 , description, NULL)) < 0) {
-// 	// 	printf("Failed to read serial number\n");
-// 	// }
-
-//     i = 0;
-//     for (curdev = devlist; curdev != NULL; i++) {
-//         printf("Checking device: %d\n", i);
-//         if((ret = ftdi_usb_get_strings(&ftdic, curdev->dev, manufacturer, 128, description, 128, serial, 128)) < 0) {
-//             fprintf(stderr, "ftdi_usb_get_strings failed: %d (%s)\n", ret, ftdi_get_error_string(&ftdic));
-//             return -1;
-//         }
-//         printf("Manufacturer: %s, Description: %s, Serial Number: %s\n\n", manufacturer, description, serial !=NULL ? serial : "") ;
-//         curdev = curdev->next;
-//     }
-//     ftdi_list_free(&devlist);
-//     ftdi_deinit(&ftdic);
-//     return 0;
+// 	return find_debuggers(NULL, NULL);
 // }
+
+int main(int argc, char **argv)
+{
+    int ret, i;
+    struct ftdi_context ftdic;
+    struct ftdi_device_list *devlist, *curdev;
+    char manufacturer[128], description[128], serial[128];
+	(void)argc ;
+	(void)argv ;
+    ftdi_init(&ftdic);
+    if((ret = ftdi_usb_find_all(&ftdic, &devlist, 0x0403, 0x6010)) < 0) {
+        fprintf(stderr, "ftdi_usb_find_all failed: %d (%s)\n", ret, ftdi_get_error_string(&ftdic));
+        return -1;
+    }
+    printf("Number of FTDI devices found: %d\n", ret);
+	// if ((ret = ftdi_usb_open_desc(&ftdic, 0x0403, 0x6010 , description, NULL)) < 0) {
+	// 	printf("Failed to read serial number -> %s\n", ftdi_get_error_string(&ftdic));
+	// }
+
+    i = 0;
+    for (curdev = devlist; curdev != NULL; i++) {
+        printf("Checking device: %d\n", i);
+        if((ret = ftdi_usb_get_strings(&ftdic, curdev->dev, manufacturer, 128, description, 128, serial, 128)) < 0) {
+			if ( ret != -9) {
+            fprintf(stderr, "ftdi_usb_get_strings failed: %d (%s)\n", ret, ftdi_get_error_string(&ftdic));
+            return -1;
+			}
+        }
+        printf("Manufacturer: %s, Description: %s, Serial Number: %s\n\n", manufacturer, description, serial !=NULL ? serial : "") ;
+        curdev = curdev->next;
+    }
+    ftdi_list_free(&devlist);
+    ftdi_deinit(&ftdic);
+    return 0;
+}
