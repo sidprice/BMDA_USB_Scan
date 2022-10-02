@@ -2,7 +2,9 @@
     "files.associations": {
         "platform.h": "c",
         "libusb.h": "c",
-        "ftdi.h": "c"
+        "ftdi.h": "c",
+        "ftd2xx.h": "c",
+        "bmp_hosted.h": "c"
     },
     "clang-tidy.compilerArgs": [
         "-std=gnu11",
@@ -19,5 +21,16 @@
         "-ID:/DataRoot/Projects/blackmagic/src/target/flashstub",
         "-ID:/DataRoot/Projects/blackmagic/src",
         "-ID:/DataRoot/Projects/blackmagic/libopencm3/include"
-    ]
+    ],
+    "python.languageServer": "Pylance",
+    "python.linting.pylintEnabled": false,
+    "python.analysis.diagnosticSeverityOverrides": {
+        "reportMissingModuleSource": "none"
+    },
+    "python.analysis.extraPaths": [
+        "",
+        "c:\\Users\\sidpr\\.vscode\\extensions\\joedevivo.vscode-circuitpython-0.1.19-win32-x64\\stubs",
+        "c:\\Users\\sidpr\\AppData\\Roaming\\Code\\User\\globalStorage\\joedevivo.vscode-circuitpython\\bundle\\20220927\\adafruit-circuitpython-bundle-py-20220927\\lib"
+    ],
+    "circuitpython.board.version": null
 }

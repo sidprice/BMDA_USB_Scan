@@ -3,13 +3,21 @@ MAKEFLAGS += --no-print-dir
 Q := @
 endif
 
+CFLAGS += -Wall -Wextra -Werror -Wno-char-subscripts \
+	-std=c11 -g3 -MD
 
 LDFLAGS += $(shell pkg-config --libs libusb-1.0) $(shell pkg-config --libs libftdi1)
 
-TARGET ?= BMP_Scan
+ifeq ($(OS), Windows_NT)
+	CFLAGS += -I../3rdparty/ftdi
+	ifeq ($(PROCESSOR_ARCHITECTURE), AMD64)
+		LDFLAGS += ../3rdparty/ftdi/amd64/ftd2xx.lib
+	else
+		LDFLAGS += ../3rdparty/ftdi/i386/ftd2xx.lib
+	endif
+endif
 
-CFLAGS += -Wall -Wextra -Werror -Wno-char-subscripts \
-	-std=c11 -g3 -MD
+TARGET ?= BMP_Scan
 
 ifeq ($(ENABLE_DEBUG), 1)
 CFLAGS += -DENABLE_DEBUG
@@ -21,9 +29,9 @@ SRC =			\
 OBJ = $(patsubst %.S,%.o,$(patsubst %.c,%.o,$(SRC)))
 
 $(TARGET): $(OBJ)
+	@echo $(shell pwd)
 	@echo "  LD      $@"
 	$(Q)$(CC) -o $@ $(OBJ) $(LDFLAGS)
-
 
 *.o:	$(SRC)
 	@echo "  CC      $<"
