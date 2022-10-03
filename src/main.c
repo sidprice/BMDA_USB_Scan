@@ -57,6 +57,7 @@ DEBUGGER_DEVICE debuggerDevices[] = {
 	{0, 0, BMP_TYPE_NONE, false, ""},
 };
 
+#if defined(_WIN32) || defined(__CYGWIN__)
 size_t process_ftdi_probe(PROBE_INFORMATION *probe_information)
 {
 	DWORD ftdiDevCount = 0;
@@ -91,7 +92,7 @@ size_t process_ftdi_probe(PROBE_INFORMATION *probe_information)
 	}
 	return devicesFound;
 }
-
+#endif
 struct libusb_device_descriptor *device_check_for_cmsis_interface(struct libusb_device_descriptor *device_descriptor,
 	libusb_device *device, libusb_device_handle *handle, PROBE_INFORMATION *probe_information)
 {
@@ -148,17 +149,18 @@ struct libusb_device_descriptor *device_check_in_vid_pid_table(
 			result = device_descriptor;
 			memcpy(probe_information->probe_type, debuggerDevices[vid_pid_index].typeString,
 				strlen(debuggerDevices[vid_pid_index].typeString));
+			//
+			// Default to unknown serial number, operations below may fail
+			//
+			memcpy(probe_information->serial_number, "Unknown", sizeof("Unknown"));
 			if (libusb_open(device, &handle) == 0) {
-				if (libusb_get_string_descriptor_ascii(handle, device_descriptor->iSerialNumber,
+				if ( device_descriptor->iSerialNumber != 0) {
+					libusb_get_string_descriptor_ascii(handle, device_descriptor->iSerialNumber,
 						(unsigned char *)&probe_information->serial_number,
-						sizeof(probe_information->serial_number)) <= 0) {
-					memset(probe_information->probe_type, 0x00, sizeof(probe_information->probe_type));
+						sizeof(probe_information->serial_number)) ;
 				}
 				libusb_close(handle);
-			} else {
-				memcpy(probe_information->serial_number, "Unknown", sizeof("Unknown"));
 			}
-
 			break;
 		}
 		vid_pid_index++;
@@ -182,12 +184,16 @@ int find_debuggers(BMP_CL_OPTIONS_t *cl_opts, bmp_info_t *info)
 	ssize_t cnt;
 	size_t deviceIndex = 0;
 	size_t debuggerCount = 0;
+	bool skipFTDI ;
 	//
 	// If we are running on Windows the proprietory FTD2XX library is used
 	// to collect debugger information.
 	//
 #if defined(_WIN32) || defined(__CYGWIN__)
 	debuggerCount += process_ftdi_probe(probes);
+	skipFTDI = true ;
+#else
+	skipFTDI = false ;
 #endif
 	result = libusb_init(NULL);
 	if (result == 0) {
@@ -203,10 +209,7 @@ int find_debuggers(BMP_CL_OPTIONS_t *cl_opts, bmp_info_t *info)
 					result = fprintf(stderr, "failed to get device descriptor");
 					return -1;
 				}
-				//
-				// Check if the device is an FTDI probe, these are processed above so skip
-				//
-				if (device_descriptor.idVendor != VENDOR_ID_FTDI) {
+				if (skipFTDI == false) {
 					if ((known_device_descriptor = device_check_in_vid_pid_table(
 							 &device_descriptor, device, &probes[debuggerCount])) == NULL) {
 						//
@@ -234,7 +237,7 @@ int find_debuggers(BMP_CL_OPTIONS_t *cl_opts, bmp_info_t *info)
 		//
 		if (debuggerCount != 0) {
 			for (size_t debugger_index = 0; debugger_index < debuggerCount; debugger_index++) {
-				printf("%lld\t%-20s\tS/N: %s\n", debugger_index + 1, probes[debugger_index].probe_type,
+				printf("%zu\t%-20s\tS/N: %s\n", debugger_index + 1, probes[debugger_index].probe_type,
 					probes[debugger_index].serial_number);
 			}
 		} else {
