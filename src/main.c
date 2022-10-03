@@ -63,7 +63,6 @@ size_t process_ftdi_probe(PROBE_INFORMATION *probe_information)
 	size_t devicesFound = 0;
 	FT_DEVICE_LIST_INFO_NODE *devInfo;
 	if (FT_CreateDeviceInfoList(&ftdiDevCount) == FT_OK) {
-		printf("Found %ld FTDI devices\n", ftdiDevCount);
 		if ((devInfo = (FT_DEVICE_LIST_INFO_NODE *)malloc(sizeof(FT_DEVICE_LIST_INFO_NODE) * ftdiDevCount)) != NULL) {
 			if (FT_GetDeviceInfoList(devInfo, &ftdiDevCount) == FT_OK) {
 				//
