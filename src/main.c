@@ -57,14 +57,8 @@ DEBUGGER_DEVICE debuggerDevices[] = {
 	{0, 0, BMP_TYPE_NONE, false, ""},
 };
 
-// static struct ftdi_context *ftdi = NULL;
-struct libusb_device_descriptor *process_ftdi_probe(
-	struct libusb_device_descriptor *device_descriptor, libusb_device *device, PROBE_INFORMATION *probe_information)
+void process_ftdi_probe(PROBE_INFORMATION *probe_information, size_t *debuggerCount)
 {
-	(void)device_descriptor;
-	(void)device;
-	(void)probe_information;
-	return NULL;
 }
 
 struct libusb_device_descriptor *device_check_for_cmsis_interface(struct libusb_device_descriptor *device_descriptor,
@@ -110,7 +104,7 @@ struct libusb_device_descriptor *device_check_for_cmsis_interface(struct libusb_
 	return result;
 }
 
-struct libusb_device_descriptor *device_in_vid_pid_table(
+struct libusb_device_descriptor *device_check_in_vid_pid_table(
 	struct libusb_device_descriptor *device_descriptor, libusb_device *device, PROBE_INFORMATION *probe_information)
 {
 	struct libusb_device_descriptor *result = NULL;
@@ -155,36 +149,14 @@ int find_debuggers(BMP_CL_OPTIONS_t *cl_opts, bmp_info_t *info)
 
 	int result;
 	ssize_t cnt;
-	int deviceIndex = 0;
-	int debuggerCount = 1;
+	size_t deviceIndex = 0;
+	size_t debuggerCount = 0;
 	//
 	// If we are running on Windows the proprietory FTD2XX library is used
 	// to collect debugger information.
 	//
 #if defined(_WIN32) || defined(__CYGWIN__)
-	FT_STATUS ftStatus;
-	FT_DEVICE_LIST_INFO_NODE *deviceInformation;
-	DWORD numberOfDevices;
-	if ((ftStatus = FT_CreateDeviceInfoList(&numberOfDevices)) == FT_OK) {
-		if (numberOfDevices > 0) {
-			//
-			// Process all attached FTDI devices
-			//
-			if ((deviceInformation = (FT_DEVICE_LIST_INFO_NODE *)malloc(
-					 sizeof(FT_DEVICE_LIST_INFO_NODE) * numberOfDevices)) == NULL) {
-				printf("Failed to allocate memory for FTDI devove scanning\n");
-			} else {
-				memset(deviceInformation, 0x00, sizeof(FT_DEVICE_LIST_INFO_NODE) * numberOfDevices);
-				if ((ftStatus = FT_GetDeviceInfoList(deviceInformation, &numberOfDevices)) != FT_OK) {
-					printf("Failed to load FTDI device information list");
-				} else {
-					for (DWORD index = 0; index < numberOfDevices; index++) {
-						printf("Serial Number is %s\n", deviceInformation[index].SerialNumber);
-					}
-				}
-			}
-		}
-	}
+	process_ftdi_probe(probes, &debuggerCount);
 #endif
 	result = libusb_init(NULL);
 	if (result == 0) {
@@ -195,86 +167,88 @@ int find_debuggers(BMP_CL_OPTIONS_t *cl_opts, bmp_info_t *info)
 			//
 			while ((device = device_list[deviceIndex++]) != NULL) {
 				result = libusb_get_device_descriptor(device, &device_descriptor);
-				memset(probes[debuggerCount - 1].serial_number, 0x00, sizeof(probes[debuggerCount - 1].serial_number));
+				memset(probes[debuggerCount].serial_number, 0x00, sizeof(probes[debuggerCount].serial_number));
 				if (result < 0) {
 					result = fprintf(stderr, "failed to get device descriptor");
 					return -1;
 				}
 				//
-				// Check if the device is an FTDI probe
+				// Check if the device is an FTDI probe, these are processed above so skip
 				//
-				if (device_descriptor.idVendor == VENDOR_ID_FTDI) {
-					known_device_descriptor =
-						process_ftdi_probe(&device_descriptor, device, &probes[debuggerCount - 1]);
-				} else if ((known_device_descriptor = device_in_vid_pid_table(
-								&device_descriptor, device, &probes[debuggerCount - 1])) == NULL) {
-					//
-					// Check if there is a CMSIS interface on this device
-					//
-					known_device_descriptor = device_check_for_cmsis_interface(
-						&device_descriptor, device, handle, &probes[debuggerCount - 1]);
-				}
-				//
-				// If we have a known device we can continue to report its data
-				//
-				if (known_device_descriptor != NULL) {
-					if (device_descriptor.idVendor == VENDOR_ID_STLINK &&
-						device_descriptor.idProduct == PRODUCT_ID_STLINKV2) {
-						memcpy(probes[debuggerCount - 1].serial_number, "Unknown", 8);
+				if (device_descriptor.idVendor != VENDOR_ID_FTDI) {
+					if ((known_device_descriptor = device_check_in_vid_pid_table(
+							 &device_descriptor, device, &probes[debuggerCount])) == NULL) {
+						//
+						// Check if there is a CMSIS interface on this device
+						//
+						known_device_descriptor = device_check_for_cmsis_interface(
+							&device_descriptor, device, handle, &probes[debuggerCount]);
 					}
-					printf("%d\t%04hX:%04hX\t%-20s\tS/N: %s\n", debuggerCount, device_descriptor.idVendor,
-						device_descriptor.idProduct, probes[debuggerCount - 1].probe_type,
-						probes[debuggerCount - 1].serial_number);
-					debuggerCount++;
+					//
+					// If we have a known device we can continue to report its data
+					//
+					if (known_device_descriptor != NULL) {
+						if (device_descriptor.idVendor == VENDOR_ID_STLINK &&
+							device_descriptor.idProduct == PRODUCT_ID_STLINKV2) {
+							memcpy(probes[debuggerCount].serial_number, "Unknown", 8);
+						}
+						debuggerCount++;
+					}
 				}
 			}
 			libusb_free_device_list(device_list, 1);
 		}
-		// if (ftdi != NULL) {
-		// 	ftdi_free(ftdi);
-		// }
-		libusb_exit(NULL); // Silly
+		//
+		// Print the probes found
+		//
+		if (debuggerCount != 0) {
+			for (size_t debugger_index = 0; debugger_index < debuggerCount; debugger_index++) {
+				printf("%lld\t%-20s\tS/N: %s\n", debugger_index + 1, probes[debugger_index].probe_type,
+					probes[debugger_index].serial_number);
+			}
+		}
+		libusb_exit(NULL);
 	}
 
 	return result;
 }
 
-// int main(void)
-// {
-// 	return find_debuggers(NULL, NULL);
-// }
-
-int main(int argc, char **argv)
+int main(void)
 {
-    int ret, i;
-    struct ftdi_context ftdic;
-    struct ftdi_device_list *devlist, *curdev;
-    char manufacturer[128], description[128], serial[128];
-	(void)argc ;
-	(void)argv ;
-    ftdi_init(&ftdic);
-    if((ret = ftdi_usb_find_all(&ftdic, &devlist, 0x0403, 0x6010)) < 0) {
-        fprintf(stderr, "ftdi_usb_find_all failed: %d (%s)\n", ret, ftdi_get_error_string(&ftdic));
-        return -1;
-    }
-    printf("Number of FTDI devices found: %d\n", ret);
-	// if ((ret = ftdi_usb_open_desc(&ftdic, 0x0403, 0x6010 , description, NULL)) < 0) {
-	// 	printf("Failed to read serial number -> %s\n", ftdi_get_error_string(&ftdic));
-	// }
-
-    i = 0;
-    for (curdev = devlist; curdev != NULL; i++) {
-        printf("Checking device: %d\n", i);
-        if((ret = ftdi_usb_get_strings(&ftdic, curdev->dev, manufacturer, 128, description, 128, serial, 128)) < 0) {
-			if ( ret != -9) {
-            fprintf(stderr, "ftdi_usb_get_strings failed: %d (%s)\n", ret, ftdi_get_error_string(&ftdic));
-            return -1;
-			}
-        }
-        printf("Manufacturer: %s, Description: %s, Serial Number: %s\n\n", manufacturer, description, serial !=NULL ? serial : "") ;
-        curdev = curdev->next;
-    }
-    ftdi_list_free(&devlist);
-    ftdi_deinit(&ftdic);
-    return 0;
+	return find_debuggers(NULL, NULL);
 }
+
+// int main(int argc, char **argv)
+// {
+//     int ret, i;
+//     struct ftdi_context ftdic;
+//     struct ftdi_device_list *devlist, *curdev;
+//     char manufacturer[128], description[128], serial[128];
+// 	(void)argc ;
+// 	(void)argv ;
+//     ftdi_init(&ftdic);
+//     if((ret = ftdi_usb_find_all(&ftdic, &devlist, 0x0403, 0x6010)) < 0) {
+//         fprintf(stderr, "ftdi_usb_find_all failed: %d (%s)\n", ret, ftdi_get_error_string(&ftdic));
+//         return -1;
+//     }
+//     printf("Number of FTDI devices found: %d\n", ret);
+// 	// if ((ret = ftdi_usb_open_desc(&ftdic, 0x0403, 0x6010 , description, NULL)) < 0) {
+// 	// 	printf("Failed to read serial number -> %s\n", ftdi_get_error_string(&ftdic));
+// 	// }
+
+//     i = 0;
+//     for (curdev = devlist; curdev != NULL; i++) {
+//         printf("Checking device: %d\n", i);
+//         if((ret = ftdi_usb_get_strings(&ftdic, curdev->dev, manufacturer, 128, description, 128, serial, 128)) < 0) {
+// 			if ( ret != -9) {
+//             fprintf(stderr, "ftdi_usb_get_strings failed: %d (%s)\n", ret, ftdi_get_error_string(&ftdic));
+//             return -1;
+// 			}
+//         }
+//         printf("Manufacturer: %s, Description: %s, Serial Number: %s\n\n", manufacturer, description, serial !=NULL ? serial : "") ;
+//         curdev = curdev->next;
+//     }
+//     ftdi_list_free(&devlist);
+//     ftdi_deinit(&ftdic);
+//     return 0;
+// }

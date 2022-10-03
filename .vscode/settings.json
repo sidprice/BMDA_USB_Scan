@@ -4,7 +4,14 @@
         "libusb.h": "c",
         "ftdi.h": "c",
         "ftd2xx.h": "c",
-        "bmp_hosted.h": "c"
+        "bmp_hosted.h": "c",
+        "concepts": "c",
+        "cstdio": "c",
+        "cwchar": "c",
+        "type_traits": "c",
+        "new": "c",
+        "typeinfo": "c",
+        "CORECRT.H": "cpp"
     },
     "clang-tidy.compilerArgs": [
         "-std=gnu11",
