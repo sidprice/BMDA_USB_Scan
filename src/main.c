@@ -209,7 +209,7 @@ int find_debuggers(BMP_CL_OPTIONS_t *cl_opts, bmp_info_t *info)
 					result = fprintf(stderr, "failed to get device descriptor");
 					return -1;
 				}
-				if (skipFTDI == false) {
+				if ( device_descriptor.idVendor != VENDOR_ID_FTDI || skipFTDI == false) {
 					if ((known_device_descriptor = device_check_in_vid_pid_table(
 							 &device_descriptor, device, &probes[debuggerCount])) == NULL) {
 						//
