@@ -57,8 +57,40 @@ DEBUGGER_DEVICE debuggerDevices[] = {
 	{0, 0, BMP_TYPE_NONE, false, ""},
 };
 
-void process_ftdi_probe(PROBE_INFORMATION *probe_information, size_t *debuggerCount)
+size_t process_ftdi_probe(PROBE_INFORMATION *probe_information)
 {
+	DWORD ftdiDevCount = 0;
+	size_t devicesFound = 0;
+	FT_DEVICE_LIST_INFO_NODE *devInfo;
+	if (FT_CreateDeviceInfoList(&ftdiDevCount) == FT_OK) {
+		printf("Found %ld FTDI devices\n", ftdiDevCount);
+		if ((devInfo = (FT_DEVICE_LIST_INFO_NODE *)malloc(sizeof(FT_DEVICE_LIST_INFO_NODE) * ftdiDevCount)) != NULL) {
+			if (FT_GetDeviceInfoList(devInfo, &ftdiDevCount) == FT_OK) {
+				//
+				// Device list is loaded, iterate over the found probes
+				//
+				for (size_t devIndex = 0; devIndex < ftdiDevCount; devIndex++) {
+					memcpy(probe_information->probe_type, devInfo[devIndex].Description,
+						strlen(devInfo[devIndex].Description));
+					size_t serial_len = strlen(devInfo[devIndex].SerialNumber) - 1U;
+					if (devInfo[devIndex].SerialNumber[serial_len] == 'A') {
+						devInfo[devIndex].SerialNumber[serial_len] = '\0';
+					}
+					if (serial_len == 0) {
+						memcpy(probe_information->serial_number, "Unknown", strlen("Unknown"));
+					} else {
+						memcpy(probe_information->serial_number, devInfo[devIndex].SerialNumber,
+							strlen(devInfo[devIndex].SerialNumber));
+					}
+					devicesFound++;
+					probe_information++;
+				}
+			}
+		} else {
+			printf("process_ftdi_probe: memory allocation failed\n");
+		}
+	}
+	return devicesFound;
 }
 
 struct libusb_device_descriptor *device_check_for_cmsis_interface(struct libusb_device_descriptor *device_descriptor,
@@ -156,7 +188,7 @@ int find_debuggers(BMP_CL_OPTIONS_t *cl_opts, bmp_info_t *info)
 	// to collect debugger information.
 	//
 #if defined(_WIN32) || defined(__CYGWIN__)
-	process_ftdi_probe(probes, &debuggerCount);
+	debuggerCount += process_ftdi_probe(probes);
 #endif
 	result = libusb_init(NULL);
 	if (result == 0) {
@@ -206,6 +238,8 @@ int find_debuggers(BMP_CL_OPTIONS_t *cl_opts, bmp_info_t *info)
 				printf("%lld\t%-20s\tS/N: %s\n", debugger_index + 1, probes[debugger_index].probe_type,
 					probes[debugger_index].serial_number);
 			}
+		} else {
+			printf("No debug probes attached\n");
 		}
 		libusb_exit(NULL);
 	}
